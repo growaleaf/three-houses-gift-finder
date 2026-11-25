@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fire Emblem: Three Houses Gift Finder</title>
+<style>
+  :root {
+    --bg: #14151c;
+    --panel: #1f212b;
+    --border: #353846;
+    --text: #e7e8ee;
+    --muted: #9497a6;
+    --favorite: #3f7d4f;
+    --dislike: #7d3f3f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.4;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 24px 16px 64px;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin: 0 0 4px;
+  }
+  p.sub {
+    color: var(--muted);
+    margin: 0 0 24px;
+    font-size: 0.9rem;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  input[type="text"], select {
+    width: 100%;
+    padding: 10px;
+    font-size: 1rem;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .results {
+    margin-top: 16px;
+  }
+  .result-group {
+    margin-bottom: 14px;
+  }
+  .result-group h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 0 0 6px;
+  }
+  .favorite h3 { color: #7fc490; }
+  .dislike h3 { color: #d68080; }
+  ul.char-list, ul.item-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  ul.char-list li, ul.item-list li {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+  }
+  .favorite li { background: rgba(63,125,79,0.25); border-color: var(--favorite); }
+  .dislike li { background: rgba(125,63,63,0.25); border-color: var(--dislike); }
+  .empty {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .note {
+    color: var(--muted);
+    font-size: 0.78rem;
+    margin: 0 0 6px;
+  }
+  footer {
+    color: var(--muted);
+    font-size: 0.78rem;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    margin-top: 32px;
+  }
+  footer p { margin: 0 0 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Fire Emblem: Three Houses Gift Finder</h1>
+  <p class="sub">Type an item to see which students favorite or dislike it. Or pick a student to see their full list.</p>
+
+  <div class="panel">
+    <label for="item-search">Search by item</label>
+    <input type="text" id="item-search" placeholder="e.g. Board Game, Carnation, Smoked Meat" autocomplete="off">
+    <div class="results" id="item-results"></div>
+  </div>
+
+  <div class="panel">
+    <label for="char-select">Browse by student</label>
+    <select id="char-select">
+      <option value="">Choose a student&hellip;</option>
+    </select>
+    <div class="results" id="char-results"></div>
+  </div>
+
+  <footer id="disclosure">
+    <p>Data source: thegamer.com, "Fire Emblem: Three Houses - Character Gift Guide" (published 2021-04-25, last modified 2023-03-22). Fetched 2026-11-24.</p>
+    <p>39 students/characters covered by the source. The source heads one table "Hueburt"; this data corrects it to "Hubert" and discloses the correction.</p>
+    <p>Single source; guides may differ from the game. Verify in-game.</p>
+  </footer>
+</main>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  var itemInput = document.getElementById("item-search");
+  var itemResults = document.getElementById("item-results");
+  var charSelect = document.getElementById("char-select");
+  var charResults = document.getElementById("char-results");
+
+  var charNames = CHARACTERS.map(function (c) { return c.name; }).sort();
+  charNames.forEach(function (name) {
+    var opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    charSelect.appendChild(opt);
+  });
+
+  function renderGroup(container, label, cls, names) {
+    if (names.length === 0) return;
+    var group = document.createElement("div");
+    group.className = "result-group " + cls;
+    var h = document.createElement("h3");
+    h.textContent = label + " (" + names.length + ")";
+    group.appendChild(h);
+    var ul = document.createElement("ul");
+    ul.className = "char-list";
+    names.forEach(function (name) {
+      var li = document.createElement("li");
+      li.textContent = name;
+      ul.appendChild(li);
+    });
+    group.appendChild(ul);
+    container.appendChild(group);
+  }
+
+  function searchItem(query) {
+    itemResults.innerHTML = "";
+    var q = query.trim().toLowerCase();
+    if (q.length === 0) return;
+
+    var favorites = [];
+    var dislikes = [];
+
+    CHARACTERS.forEach(function (c) {
+      if (c.favorites.some(function (g) { return g.toLowerCase().indexOf(q) !== -1; })) favorites.push(c.name);
+      if (c.dislikes.some(function (g) { return g.toLowerCase().indexOf(q) !== -1; })) dislikes.push(c.name);
+    });
+
+    if (favorites.length === 0 && dislikes.length === 0) {
+      var p = document.createElement("p");
+      p.className = "empty";
+      p.textContent = "No match in the 39 students covered by this source.";
+      itemResults.appendChild(p);
+      return;
+    }
+
+    renderGroup(itemResults, "Favorites", "favorite", favorites);
+    renderGroup(itemResults, "Dislikes", "dislike", dislikes);
+  }
+
+  function renderItemList(container, label, cls, items) {
+    if (items.length === 0) return;
+    var group = document.createElement("div");
+    group.className = "result-group " + cls;
+    var h = document.createElement("h3");
+    h.textContent = label + " (" + items.length + ")";
+    group.appendChild(h);
+    var ul = document.createElement("ul");
+    ul.className = "item-list";
+    items.forEach(function (item) {
+      var li = document.createElement("li");
+      li.textContent = item;
+      ul.appendChild(li);
+    });
+    group.appendChild(ul);
+    container.appendChild(group);
+  }
+
+  function showCharacter(name) {
+    charResults.innerHTML = "";
+    if (!name) return;
+    var c = CHARACTERS.find(function (x) { return x.name === name; });
+    if (!c) return;
+    if (c.source_typo) {
+      var note = document.createElement("p");
+      note.className = "note";
+      note.textContent = "Source table heading read \"" + c.source_typo + "\"; corrected here to \"" + c.name + "\".";
+      charResults.appendChild(note);
+    }
+    renderItemList(charResults, "Favorites", "favorite", c.favorites);
+    renderItemList(charResults, "Dislikes", "dislike", c.dislikes);
+  }
+
+  itemInput.addEventListener("input", function () { searchItem(itemInput.value); });
+  charSelect.addEventListener("change", function () { showCharacter(charSelect.value); });
+})();
+</script>
+</body>
+</html>
